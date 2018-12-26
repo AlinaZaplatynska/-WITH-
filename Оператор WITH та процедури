@@ -1,0 +1,39 @@
+1)
+WITH MostExpensiveDue AS (SELECT MAX(TotalDue) AS MaxDue FROM SalesLT.SalesOrderHeader)
+SELECT Customer.NameStyle, Customer.CompanyName, Customer.FirstName, Customer.LastName, SalesOrderHeader.OrderDate, SalesOrderHeader.TotalDue
+FROM SalesLT.SalesOrderHeader, SalesLT.Customer, MostExpensiveDue
+WHERE SalesOrderHeader.CustomerID=Customer.CustomerID AND SalesOrderHeader.TotalDue=MostExpensiveDue.MaxDue
+
+2)
+DECLARE @MaxTotal FLOAT
+SET @MaxTotal = (SELECT MAX(TotalDue) AS Max FROM SalesLT.SalesOrderHeader)
+SELECT Customer.FirstName, Customer.LastName,Customer.CompanyName, SalesOrderHeader.OrderDate, SalesOrderHeader.TotalDue
+FROM SalesLT.SalesOrderHeader INNER JOIN SalesLT.Customer
+  ON SalesOrderHeader.CustomerID = Customer.CustomerID
+  WHERE SalesOrderHeader.TotalDue = @MaxTotal
+
+3)WITH DateSeries(date1, date2) 
+AS
+(
+  SELECT CAST('2012-01-01' AS DATE) AS date1, EOMONTH(CAST('2012-01-01' AS DATE)) AS date2
+  UNION ALL
+  SELECT DATEADD(mm, 1, date1), EOMONTH(DATEADD(mm,1,date2))
+  FROM DateSeries
+  WHERE date2<DATEADD(mm, -1, DATEADD(yy, 1, CAST('2012-01-01' AS DATE)))
+)
+SELECT DS.date1, DS.date2,a.City, SUM(SOH.TotalDue) AS 'Total Due'
+FROM DateSeries DS , SalesLT.SalesOrderHeader SOH
+INNER JOIN SalesLT.Address A ON SOH.BillToAddressID = A.AddressID
+WHERE SOH.OrderDate BETWEEN DS.date1 and DS.date2
+GROUP BY A.City, DS.date1, DS.date2
+ORDER BY A.City, DS.date1, DS.date2
+4)
+CREATE PROCEDURE ExpensiveOrders @DATE_BEGIN AS DATE, @DATE_END AS DATE 
+AS
+  SELECT SOH.ShipMethod as 'Delivery Service', SOH.SalesOrderNumber as 'Order Number', SOH.OrderDate as 'Order Date', SOD.LineTotal as 'Total' 
+  FROM SalesLT.SalesOrderHeader SOH LEFT JOIN SalesLT.SalesOrderDetail SOD 
+    ON SOH.SalesOrderID = SOD.SalesOrderID  
+  WHERE SOH.OrderDate > @DATE_BEGIN AND SOH.OrderDate < @DATE_END
+  GROUP BY SOH.ShipMethod, SOH.SalesOrderNumber, SOH.OrderDate, SOD.LineTotal
+  ORDER BY SOD.LineTotal DESC
+GO
